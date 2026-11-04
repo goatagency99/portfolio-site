@@ -21,6 +21,9 @@
     { name:"Ring Robin", url:"ringrobin.net", href:"https://ringrobin.net/", image:"juan-mora-assets/websites/ring-robin.jpg" },
     { name:"Ekogram", url:"ekogram.pl/en", href:"https://ekogram.pl/en", image:"juan-mora-assets/websites/ekogram.jpg" },
     { name:"Water Damage Edmond", url:"waterdamageedmond.net", href:"https://waterdamageedmond.net/", image:"juan-mora-assets/websites/waterdamageedmond.webp" },
+    { name:"artbymarc", url:"artbymarc.net", href:"https://artbymarc.net/", image:"juan-mora-assets/websites/artbymarc.jpg" },
+    { name:"room12", url:"room12.ro", href:"https://www.room12.ro/", image:"juan-mora-assets/websites/room12.jpg" },
+    { name:"taverna cluj", url:"tavernaracilorcluj.pages.dev", href:"https://tavernaracilorcluj.pages.dev/", image:"juan-mora-assets/websites/taverna-cluj.jpg" },
   ];
 
   track.innerHTML = sites.map(function (site, i) {
