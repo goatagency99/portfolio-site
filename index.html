@@ -775,6 +775,17 @@
     .ai-ugc-card.is-letterboxed video {
       object-fit: contain;
     }
+    /* Swipeable reels (like bymarccc.com): swipe, tap to play/pause, sound toggle */
+    .ai-ugc-carousel{-webkit-mask-image:none!important;mask-image:none!important;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:4px 0 10px}
+    .ai-ugc-carousel::-webkit-scrollbar{display:none}
+    .ai-ugc-track{animation:none!important;transform:none!important;padding:0 24px}
+    .ai-ugc-card{scroll-snap-align:start;cursor:pointer;border-radius:18px!important;flex:0 0 clamp(240px,20vw,320px)!important}
+    .ai-ugc-card.is-letterboxed video{object-fit:contain}
+    .ai-ugc-card .ai-play{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;pointer-events:none;transition:opacity .2s}
+    .ai-ugc-card .ai-play:before{content:"";border-left:20px solid #111;border-top:12px solid transparent;border-bottom:12px solid transparent;margin-left:6px}
+    .ai-ugc-card.is-playing .ai-play{opacity:0}
+    .ai-ugc-card .ai-snd{position:absolute;right:12px;bottom:12px;width:42px;height:42px;border-radius:50%;border:0;background:rgba(235,235,235,.9);color:#111;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+    @media(max-width:760px){.ai-ugc-card{flex-basis:72vw!important}.ai-ugc-track{padding:0 16px}}
     @media (max-width: 760px) {
       .ai-ugc-carousel {
         -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
@@ -2416,86 +2427,51 @@
         { mp4: "portfolio-assets/ai-videos/ai_oysterbar.mp4", webm: "portfolio-assets/ai-videos/ai_oysterbar.webm", label: "Oyster Bar Event Promo" },
         { mp4: "portfolio-assets/ai-videos/ai_thisisai.mp4", webm: "portfolio-assets/ai-videos/ai_thisisai.webm", label: "This Is AI" }
       ];
-      // H.264 MP4 first: iOS/Safari doesn't support WebM/VP9 at all, so an
-      // mp4-only <video src> shows as a black box there. Listing the mp4
-      // <source> first lets Safari pick it while other browsers can still
-      // fall back to the (slightly smaller) webm.
+      const SV = (x) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z" fill="currentColor"/>' + x + '</svg>';
+      const ICON_OFF = SV('<path d="m22 9-6 6M16 9l6 6"/>'), ICON_ON = SV('<path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>');
       const template = (card) => `
         <article class="ai-ugc-card${card.letterbox ? ' is-letterboxed' : ''}">
-          <video autoplay muted loop playsinline webkit-playsinline preload="auto">
-            <source src="${card.mp4}" type="video/mp4">
-            <source src="${card.webm}" type="video/webm">
+          <video muted loop playsinline webkit-playsinline preload="metadata" aria-label="${card.label}">
+            <source src="${card.mp4}#t=0.1" type="video/mp4">
+            ${card.webm ? `<source src="${card.webm}" type="video/webm">` : ''}
           </video>
+          <span class="ai-play" aria-hidden="true"></span>
+          <button class="ai-snd" type="button" aria-label="Sound on/off">${ICON_OFF}</button>
         </article>`;
       document.querySelectorAll('[data-ai-ugc-track]').forEach((track) => {
-        track.innerHTML = cards.map(template).join('') + cards.map(template).join('');
-        const videos = [...track.querySelectorAll('video')];
-        const tryPlayAll = () => videos.forEach((v) => { v.play().catch(() => {}); });
-        tryPlayAll();
-        // Some mobile browsers ignore the autoplay attribute until the
-        // video is actually in view or a user has interacted with the
-        // page at all — cover both with an IntersectionObserver plus a
-        // one-time retry on first touch/scroll.
+        track.innerHTML = cards.map(template).join('');
+        const all = [...track.querySelectorAll('.ai-ugc-card')];
+        const pauseOthers = (keep) => all.forEach((c) => {
+          if (c === keep) return;
+          const v = c.querySelector('video');
+          if (!v.paused) v.pause();
+          c.classList.remove('is-playing');
+        });
+        all.forEach((card) => {
+          const v = card.querySelector('video');
+          const snd = card.querySelector('.ai-snd');
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('.ai-snd')) return;
+            if (v.paused) { pauseOthers(card); v.play().then(() => card.classList.add('is-playing')).catch(() => {}); }
+            else { v.pause(); card.classList.remove('is-playing'); }
+          });
+          snd.addEventListener('click', () => {
+            v.muted = !v.muted;
+            snd.innerHTML = v.muted ? ICON_OFF : ICON_ON;
+            if (!v.muted && v.paused) { pauseOthers(card); v.play().then(() => card.classList.add('is-playing')).catch(() => {}); }
+          });
+        });
         if ('IntersectionObserver' in window) {
           const io = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-              const v = entry.target;
-              if (entry.isIntersecting) v.play().catch(() => {});
+            entries.forEach((en) => {
+              if (!en.isIntersecting) {
+                const c = en.target; const v = c.querySelector('video');
+                if (!v.paused) { v.pause(); c.classList.remove('is-playing'); }
+              }
             });
-          }, { threshold: 0.1 });
-          videos.forEach((v) => io.observe(v));
+          }, { threshold: 0.2 });
+          all.forEach((c) => io.observe(c));
         }
-        ['touchstart', 'scroll', 'click'].forEach((evt) => {
-          window.addEventListener(evt, tryPlayAll, { once: true, passive: true });
-        });
-
-        // Auto-scroll, driven manually via requestAnimationFrame instead of
-        // a CSS @keyframes animation. The track's children are injected
-        // above (after the stylesheet already applied), and on several
-        // iOS/iPhone Safari versions a CSS `animation` on an element in
-        // that situation — especially paired with the parent's
-        // mask-image + overflow:hidden — simply never starts, leaving the
-        // carousel frozen. Setting `transform` by hand every frame works
-        // identically everywhere and also makes the speed easy to tune per
-        // breakpoint (desktop runs 2x the mobile/original speed).
-        const carousel = track.closest('.ai-ugc-carousel');
-        const desktopQuery = window.matchMedia('(min-width: 761px)');
-        let halfWidth = 0;
-        let offset = 0;
-        let lastTime = null;
-        let hovering = false;
-        let rafId = 0;
-
-        const measure = () => {
-          halfWidth = track.scrollWidth / 2;
-        };
-        measure();
-        window.addEventListener('resize', measure);
-        window.addEventListener('load', measure);
-
-        if (carousel) {
-          carousel.addEventListener('mouseenter', () => { hovering = true; });
-          carousel.addEventListener('mouseleave', () => { hovering = false; });
-        }
-
-        const step = (now) => {
-          if (lastTime === null) lastTime = now;
-          const dt = (now - lastTime) / 1000;
-          lastTime = now;
-          if (!hovering && halfWidth > 0) {
-            // Seconds to travel one full set of cards (half the doubled
-            // track). Desktop's original pace was 22.7s; halving it makes
-            // desktop scroll 2x as fast. Mobile keeps its original 16s
-            // pace — it just actually runs now.
-            const duration = desktopQuery.matches ? 11.35 : 16;
-            const speed = halfWidth / duration;
-            offset += speed * dt;
-            if (offset >= halfWidth) offset -= halfWidth;
-            track.style.transform = `translate3d(${-offset}px,0,0)`;
-          }
-          rafId = requestAnimationFrame(step);
-        };
-        rafId = requestAnimationFrame(step);
       });
     })();
 
